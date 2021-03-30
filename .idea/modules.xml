@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/sso/member/member.iml" filepath="$PROJECT_DIR$/sso/member/member.iml" />
+      <module fileurl="file://$PROJECT_DIR$/sso-shiro/member_shiro/member_shiro.iml" filepath="$PROJECT_DIR$/sso-shiro/member_shiro/member_shiro.iml" />
+      <module fileurl="file://$PROJECT_DIR$/sso/order/order.iml" filepath="$PROJECT_DIR$/sso/order/order.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/springboot-sso-cas-shrio.iml" filepath="$PROJECT_DIR$/.idea/springboot-sso-cas-shrio.iml" />
+      <module fileurl="file://$PROJECT_DIR$/sso-shiro/sso_login_shiro.iml" filepath="$PROJECT_DIR$/sso-shiro/sso_login_shiro.iml" />
+    </modules>
+  </component>
+</project>

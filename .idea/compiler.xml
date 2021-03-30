@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="cas-overlay" />
+        <module name="member_shiro" />
+        <module name="member" />
+        <module name="order" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="member" target="1.8" />
+      <module name="member (1)" target="1.8" />
+      <module name="member_shiro" target="1.8" />
+      <module name="order" target="1.8" />
+      <module name="sso_login (1)" target="1.8" />
+      <module name="sso_login_shiro" target="1.8" />
+    </bytecodeTargetLevel>
+  </component>
+</project>
