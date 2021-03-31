@@ -36,8 +36,10 @@
 
 <!--    <util:properties id="casProperties" location="file:D:\beijing\project\my\cas-overlay-template-4.2\etc\cas.properties" />-->
 	<!--	改为（根据你的项目路径而定）-->
-	<util:properties id="casProperties" location="file:D:\work\IDEA\IdeaTestGit\gitee\springboot-sso-cas-shrio\cas-server\etc\cas.properties" />
+<!--	<util:properties id="casProperties" location="file:D:\work\IDEA\IdeaTestGit\gitee\springboot-sso-cas-shrio\cas-server\etc\cas.properties" />-->
+<!--脱离教程：自己改动-->
+	<util:properties id="casProperties" location="${cas.properties.config.location:/WEB-INF/cas.properties}"/>
 
-    <context:property-placeholder properties-ref="casProperties" />
+	<context:property-placeholder properties-ref="casProperties" />
 
 </beans>
