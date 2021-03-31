@@ -1,0 +1,891 @@
+
+springboot + shiro + cas 实现 登录 + 授权 + sso单点登录 
+
+############################################################################################
+总简介：
+1.tomcat生成ssl的8443安全端口，配置证书 密码123456，生成三个tomcat 
+一个server：8443 8080 
+两个client：18443 18080 ；28443 28080 
+apache-tomcat-7.0.91-sso-ssl-server
+apache-tomcat-7.0.91-sso-ssl-cas-client1
+apache-tomcat-7.0.91-sso-ssl-cas-client2
+
+2.host 配置：
+127.0.0.1 sso.maple.com
+127.0.0.1 client1.sso.maple.com
+127.0.0.1 client2.sso.maple.com
+3.中间件方式：
+一个server：直接把war包放到server的tomcat下 cas-server-webapp-4.2.4.war
+重命名为  cas.war，并复制到 tomcat里的webapps里
+
+两个client：都是使用自带的examples作为载体
+第一步：将 cas-client-core-3.2.1.jar 和 commons-logging-1.1.jar 放到 \webapps\examples\WEB-INF\lib下面
+第二步：webapps\examples\WEB-INF\web.xml添加如下配置
+详情见：《cas的client的web.xml中配置》
+https://demo.micmiu.com:8443/cas/login
+http://app1.micmiu.com:18080
+
+https://demo.micmiu.com:8443/cas
+http://app1.micmiu.com:18080
+
+修改为：上面部署的server的cas的端口，和本client的端口	
+修改host后：
+client1：
+https://sso.maple.com:8443/cas/login
+http://client1.sso.maple.com:18080
+
+https://sso.maple.com:8443/cas
+http://client1.sso.maple.com:18080
+	
+client2：
+https://sso.maple.com:8443/cas/login
+http://client2.sso.maple.com:28080
+
+https://sso.maple.com:8443/cas
+http://client2.sso.maple.com:28080
+
+启动三个tomcat后，访问：
+一个server：
+https://sso.maple.com:8443/cas/login 或：https://sso.maple.com:8443/cas
+用户名为：casuser
+默认密码：Mellon
+退出：https://sso.maple.com:8443/cas/logout
+
+两个client：
+http://client1.sso.maple.com:18080/examples/servlets/
+http://client2.sso.maple.com:28080/examples/servlets/
+自带的欢迎页面为：
+http://client1.sso.maple.com:18080/examples/servlets/servlet/HelloWorldExample 
+http://client2.sso.maple.com:28080/examples/servlets/servlet/HelloWorldExample 
+
+
+4.shiro的cas兼容的代码：
+问题1：不能做http的访问
+Application Not Authorized to Use CAS
+D:\work\sso\apache-tomcat-7.0.91-sso-ssl-server\webapps\cas\WEB-INF\classes\services
+下面的：Apereo-10000002.json HTTPSandIMAPS-10000001.json
+
+参考1：解决
+ 该方法和简单，进入到cas服务端的web容器里，找到cas工程下的HTTPSandIMAPS-10000001.json文件，该文件在服务端的\WEB-INF\classes\services目录内
+
+将这个文件里面的
+
+"serviceId" : "^(https|imaps)://.*" 
+
+修改为
+    "serviceId" :"^(https|imaps|http)://.*"
+————————————————
+版权声明：本文为CSDN博主「陈南志」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/pucao_cug/article/details/69048359
+
+参考2
+做配置 :
+最后查找资料知晓，需要更改CAS resources下services目录里面有两个json文件，将Apereo-10000002.json文件的"serviceId" 修改为 "^http:."，HTTPSandIMAPS-10000001.json 下的
+"serviceId" 修改为 "^(http|imaps)://." ,我只是本地做测试 没有使用ssl验证，如果需要把http 更改为https就可以了 修改效果如下：
+
+作者：BetterFuture
+链接：https://www.jianshu.com/p/d4427f1517dd
+来源：简书
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+
+
+问题2：必须修改host，不然cas不认
+host 配置：
+127.0.0.1 sso.maple.com
+127.0.0.1 client1.sso.maple.com
+127.0.0.1 client2.sso.maple.com
+
+问题3：必须使用域名做证书的开头，jdk做证书的时候，第一个是域名，剩下的全部都是回车，参考下面的jdk做证书过程，若是做错了，需要做证书的删除，以及电脑的重启
+我用的全部是 mlt ，会报错，还是直接使用 sso.maple.com ，单点登录需要配置成域名，不能是ip
+后面会用到 sso.maple.com，已经做了 host 映射
+https://www.cqmaple.com/201703/error-java-security-cert-certificateexception-no-name-matching-localhost-found.html
+使用tomcat开启https 需要使用keytool命令来生产一个证书。
+
+
+5.改造cas-server，集成我们的DB
+https://sso.maple.com:8443/cas
+账户：zhangsan
+密码：zhangsan 
+默认的账密：casuser/Mellon
+退出：https://sso.maple.com:8443/cas/logout
+详细配置参考：下面的 《4、改造cas-server，集成我们的DB》
+粗流程：
+在这一步当中：我这里用的是4.2版本，因为他是maven构建的，5以上的版本是gradle构建的，我对gradle没有maven熟练。
+源码：git clone https://github.com/apereo/cas-overlay-template/tree/4.2
+分支：4.2
+需要：
+修改1：把路径改对WEB-INF/spring-configuration/propertyFileConfigurer.xml
+<util:properties id="casProperties" location="file:D:\beijing\project\my\cas-overlay-template-4.2\etc\cas.properties" />
+修改2：新建数据库：test_sso 建表：user 并插入数据
+修改3：引入pom
+修改4：修改 deployerConfigContext.xml文件
+修改 D:\beijing\project\my\cas-overlay-template-4.2\target\war\work\org.jasig.cas\cas-server-webapp\WEB-INF\deployerConfigContext.xml 这个文件
+修改5：cas.properties 文件
+把 etc/cas.properties 里面的 cas.jdbc.authn.query.sql 前面的注释去掉，加上 sql 
+
+
+6.到目前为止：分为了两个：
+1、D:\work\sso\1 中间件方式
+2、D:\work\sso\2 代码集成shiro的cas
+第二种的方式里，
+只有一个tomcat，用于部署cas的代码shiro改编。idea使用war的远程部署方式，部署
+而两个client，使用springboot的内置tomcat方式启动
+
+代码：
+https://github.com/malitao2017/springboot-sso-cas-shrio.git
+
+前提：
+第一次尝试：必须把server部署到tomcat中，mysql必须启动才能用
+第二次尝试：mysql不启动也是可以的，都是按照手写的代码走
+第三次尝试：直接用idea把server部署到tomcat中，idea中tomcat启动配置： https://sso.maple.com:8443/cas
+最终证明不可以，
+deployerConfigContext.xml 和 HTTPSandIMAPS-10000001.json
+会自动补充，并且不是自己修改的内容，只能打成war放到tomcat中运行
+第四次尝试：使用idea用exploded方式进行部署，参考的恒泰的uad的配置，uad是把所有的CAS自动生成的文件放到项目里进行修改，而本次自己的修改只是采用CAS自己的jdbc数据库访问，以及自己做的密码验证，自己拿出来的文件有：
+deployerConfigContext.xml 放到 webapp/WEB-INF/下
+cas.properties 放到 webapp/WEB-INF/下，同时webapp/WEB-INF/spring-configuration中修改：<util:properties id="casProperties" location="${cas.properties.config.location:/WEB-INF/cas.properties}"/>
+HTTPSandIMAPS-10000001.json 放到 /main/resouces/services 下
+原理是，idea自己加载到tomcat中的时候，这三个文件就会自动覆盖目标
+最重要的是可以打断点
+
+server启动方式是war包，部署到tomcat中，两个客户端使用springboot的内置tomcat方式启动
+cas的server是基于上一步的配置mysql的方式进行，自己的测试客户端 member 使用的是8082
+member:
+http://localhost:8082/index
+order:
+http://localhost:8083/index
+
+单点登录服务：配置了证书，必须使用8443连接
+https://sso.maple.com:8443/cas
+账户：zhangsan
+密码：zhangsan
+默认的账密：casuser/Mellon 使用了数据库方式，就不能用了。自己手动更改，可以用了
+退出：https://sso.maple.com:8443/cas/logout
+
+文件：增加http的访问
+HTTPSandIMAPS-10000001.json
+由："serviceId" : "^(https|imaps)://.*",
+改为：
+"serviceId" : "^(https|imaps|http)://.*",
+
+这里对比，自己单系统的shiro
+member（1）:
+http://localhost:8084/index 无拦截
+http://localhost:8084/user
+用户：maple 密码为：123456 盐值：maple 加密后：26bfdfe8689183e9235b1f0beb7a6f46
+http://localhost:8084/query 无权限，报错
+http://localhost:8084/manage 有权限
+http://localhost:8084/login
+http://localhost:8084/logout
+
+
+############################################################################################
+springboot + shiro + cas 实现 登录 + 授权 + sso单点登录 （一）
+maple 枫 2020-04-10 19:36:40  3462  收藏 26
+分类专栏： 单点登录 文章标签： shiro cas sso
+版权
+背景：
+1、每家公司基本都会有自己的管理平台，说到管理平台就离不开 角色，权限等问题，避免越权问题。所以我们引入shiro来解决这个问题，为什么用shiro呢？因为他功能全，开发简单。
+
+2、每家公司基本都不只一个管理平台，可能有很多个，如果我们登录每个平台都需要输入账号密码的话，那也太麻烦了吧。所以我们引入cas来做sso单点登录，意思就是，我只要登录了一个管理平台，从这个平台里跳到另外一个平台，就无需再登录了。
+
+ 
+
+开发步骤：
+1、首先我们先利用shiro开发角色和权限的功能
+
+2、其次开始cas的准备工作：使用cas-server和cas-client测试SSO单点登录的功能
+
+3、然后我们在springboot里把shiro和cas集成起来，当做cas-client，和cas-server一起测试SSO单点登录的功能
+
+4、改造cas-server，集成我们的DB
+
+5、多个cas-client和改造后的cas-server一起进行测试，模拟实际中的项目
+
+6、gitee地址：
+
+https://gitee.com/gane_maple/sso
+
+https://gitee.com/gane_maple/cas-server
+————————————————
+版权声明：本文为CSDN博主「maple 枫」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/qq_33101675/article/details/105440375
+
+
+############################################################################################
+详细步骤：
+############################################################################################
+1、首先我们先利用shiro开发角色和权限的功能
+#######################
+（1）修改：
+基于github下的代码做第一节的修改:https://gitee.com/gane_maple/sso
+
+通用：application.properties修改:
+#server.port=8081
+#本机的8081用于了nexus
+server.port=8080
+修改的地方都加了：第一节
+（1）member/pom.xml ： 注释掉：
+<!--        第一节：不用单点登录，只测试shiro的权限-->
+<!--        <dependency>-->
+<!--            <groupId>org.apache.shiro</groupId>-->
+<!--            <artifactId>shiro-cas</artifactId>-->
+<!--            <version>1.2.4</version>-->
+<!--        </dependency>-->
+
+（2）redis本机启动改为没有密码：root
+（3）修改logout，只是用shrio，不用CAS：ShiroCasController中
+ @GetMapping("/logout")
+    public String logout() {
+//        第一节：只测试shiro权限，不做cas登录
+        Subject subject = SecurityUtils.getSubject();
+        if (subject.isAuthenticated()) {
+            subject.logout();
+        }
+        //第一节：只用shiro，放开注释
+        return "redirect:/login";
+        //第一节：关闭CAS，只用shiro
+//        return "redirect:" + ShiroCasConfiguration.logoutUrl;
+    }
+（4）ShiroCasConfigutation的配置 ，加了：第一节 都是注释掉和放开注释的操作
+@Bean
+    public SecurityManager securityManager() {
+        DefaultWebSecurityManager defaultSecurityManager = new DefaultWebSecurityManager();
+        defaultSecurityManager.setRealm(userRealm());
+        defaultSecurityManager.setCacheManager(cacheManager());
+        //defaultSecurityManager.setSessionManager(sessionManager());
+        defaultSecurityManager.setRememberMeManager(rememberMeManager());
+        //第一节只用shiro作权限验证，注释掉
+//        defaultSecurityManager.setSubjectFactory(new CasSubjectFactory());
+        return defaultSecurityManager;
+    }
+（5）UserShiroCasRealm的配置，加了：第一节 都是注释掉和放开注释的操作
+//    第一节：只用shiro，放开注释
+    @Override
+    protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken authenticationToken) {
+
+        UsernamePasswordToken token = (UsernamePasswordToken) authenticationToken;
+
+        //通过token去查询DB，获取用户的密码，这里密码直接写死
+        User user = new User();
+        user.setUsername(token.getUsername());
+
+        return new SimpleAuthenticationInfo(user, "26bfdfe8689183e9235b1f0beb7a6f46",
+                ByteSource.Util.bytes(user.getUsername()), getName());
+
+    }
+
+#######################
+（2）测试：
+index.html：不需要登录即可访问
+
+user.html：需要用户登录才可访问，如果用户没有登录，则跳到登录页面 login.html
+
+user_manage.html：有admin:manage权限的用户，才能访问的页面
+
+user_query.html：有admin:query权限的用户，才能访问的页面
+
+（1）、启动项目，直接访问 http://localhost:8080/index ，应该可以直接访问
+
+
+（2）、直接访问 http://localhost:8080/user ，应该是跳转到登录页面
+
+
+（3）、我们输入 maple/111111，密码错误，应该还是留在登录页面
+
+
+（4）、我们输入 maple/123456，登录成功，应该是跳转到 user.html 页面
+
+
+（5）、我们访问 http://localhost:8080/query ，由于maple用户没有该 权限，所以应该报错（因为我这里没有做异常处理）
+
+
+ （6）、我们访问 http://localhost:8080/manage ，由于maple用户有该 权限，所以应该跳转到 user_manage.html 页面
+
+其他：退出：
+http://localhost:8080/login
+http://localhost:8080/logout
+
+测试完成，符号预期
+————————————————
+版权声明：本文为CSDN博主「maple 枫」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/qq_33101675/article/details/105440491
+
+############################################################################################
+2、其次开始cas的准备工作：使用cas-server和cas-client测试SSO单点登录的功能
+##################################
+证书的生成：mlt ，密码：123456 导入信任库的密码： changeit
+##################################
+一、host文件
+host文件配置DNS映射
+
+127.0.0.1 sso.maple.com
+127.0.0.1 client1.sso.maple.com
+127.0.0.1 client2.sso.maple.com
+
+1.未做，用到的地方，直接使用127.0.0.1
+2.还是修改host的吧，不然下面的client的代码就是死的
+
+二、Tomcat配置SSL
+ 1、生成证书
+例子：
+keytool -genkey -alias ssodemo -keyalg RSA -keysize 1024 -keypass 123456 -validity 365 -keystore D:\beijing\develop\apache-tomcat-9.0.34\sso\ssodemo.keystore -storepass 123456
+改编：
+cd /d D:\work\jdk\jdk1.8.0_202\bin
+keytool -genkey -alias ssodemo -keyalg RSA -keysize 1024 -keypass 123456 -validity 365 -keystore D:\work\sso\ssodemo.keystore -storepass 123456
+
+您的名字与姓氏是什么？我写的这个，和你上面配置的host一样即可，sso.maple.com
+其他的都可以直接回撤，最后输入个 是 即可。
+
+问题以及解决：
+我用的全部是 mlt ，会报错，还是直接使用 sso.maple.com ，单点登录需要配置成域名，不能是ip
+后面会用到 sso.maple.com，已经做了 host 映射
+https://www.cqmaple.com/201703/error-java-security-cert-certificateexception-no-name-matching-localhost-found.html
+使用tomcat开启https 需要使用keytool命令来生产一个证书。
+
+2、导出证书
+例子：
+keytool -export -alias ssodemo -keystore D:\beijing\develop\apache-tomcat-9.0.34\sso\ssodemo.keystore -file D:\beijing\develop\apache-tomcat-9.0.34\sso\ssodemo.crt -storepass 123456
+改编：
+keytool -export -alias ssodemo -keystore D:\work\sso\ssodemo.keystore -file D:\work\sso\ssodemo.crt -storepass 123456
+
+
+3、把证书导入到证书信任库
+例子：
+keytool -import -keystore %JAVA_HOME%\jre\lib\security\cacerts -file D:\beijing\develop\apache-tomcat-9.0.34\sso\ssodemo.crt -alias ssodemo
+改编：
+keytool -import -keystore %JAVA_HOME%\jre\lib\security\cacerts -file D:\work\sso\ssodemo.crt -alias ssodemo
+这个时候会让你输入密码，记住密码不是123456，而是 changeit。输入密码后，提示导入成功。
+
+如果你想查看证书信任库都有哪些证书，输入命令为：
+keytool -list -keystore %JAVA_HOME%/jre/lib/security/cacerts >t.txt
+改编：
+keytool -list -keystore %JAVA_HOME%/jre/lib/security/cacerts >D:\work\sso\t.txt
+当然也是输入 changeit 密码，查询一下有没有我们刚刚导入的ssodemo（我有时候可以搜到，有时候搜不到，搜不到的时候我重新导入，又提示 ssodemo 别名已存在。。。不过不影响功能）
+
+
+如果你想删除某个证书的话，输入命令为：
+例子：
+keytool -delete -trustcacerts -alias ssodemo -keystore %JAVA_HOME%/jre/lib/security/cacerts -storepass changeit
+
+改编：java.lang.Exception: 证书未导入, 别名 <ssodemo> 已经存在
+keytool -delete -trustcacerts -alias ssodemo -keystore %JAVA_HOME%/jre/lib/security/cacerts -storepass changeit
+
+
+4、修改tomcat的server.xml文件
+直接新增，里面的证书路径和密码根据你自己的修改
+例子：
+<Connector port="8443" protocol="HTTP/1.1" SSLEnabled="true"
+               maxThreads="150" scheme="https" secure="true"
+               keystoreFile="D:/beijing/develop/apache-tomcat-9.0.34/sso/ssodemo.keystore" keystorePass="123456"
+               clientAuth="false" sslProtocol="TLS" URIEncoding="UTF-8"/>
+改编：
+<Connector port="8443" protocol="HTTP/1.1" SSLEnabled="true"
+               maxThreads="150" scheme="https" secure="true"
+               keystoreFile="D:/work/sso/ssodemo.keystore" keystorePass="123456"
+               clientAuth="false" sslProtocol="TLS" URIEncoding="UTF-8"/>
+
+改编2：apache-tomcat-7.0.91的基于默认配置的修改：keystoreFile在第二行之后直接跟随不然报语法错误
+<Connector port="8443" protocol="org.apache.coyote.http11.Http11Protocol"
+               maxThreads="150" SSLEnabled="true" scheme="https" secure="true" keystoreFile="D:/work/sso/ssodemo.keystore" keystorePass="123456"
+               clientAuth="false" sslProtocol="TLS" />
+			   
+5、到bin目录启动startup.bat，然后浏览器里输入https://sso.maple.com:8443/
+一般登录：
+http://localhost:8080/
+https的登录：
+https://localhost:8443/
+
+##################################
+三、部署CAS-Server到tomcat里
+1、准备好之前下载完成的cas-server-webapp-4.2.4.war与cas-client-core-3.2.1.jar
+2、部署CAS-Server，把下载好的cas-server-webapp-4.2.4.war重命名为  cas.war，并复制到 tomcat里的webapps里，重启tomcat，访问 https://sso.maple.com:8443/cas/login，可以看到这个页面
+
+改编：
+https://127.0.0.1:8443/cas/login
+默认用户名为：casuser，默认密码为：Mellon，输入之后显示登录成功
+改动host后：
+https://sso.maple.com:8443/cas/login
+用户名为：casuser
+默认密码：Mellon
+退出： https://sso.maple.com:8443/cas/logout
+
+##################################
+四、部署CAS-Client到tomcat里
+1、我把tomcat的安装包又copy了两份，分别命名为 apache-tomcat-9.0.34-cas-client1，apache-tomcat-9.0.34-cas-client2
+改编：
+命名：
+apache-tomcat-7.0.91-sso-ssl-server
+apache-tomcat-7.0.91-sso-ssl-cas-client1
+apache-tomcat-7.0.91-sso-ssl-cas-client2
+
+
+2、如果要一台电脑运行三个tomcat的话，需要修改一些端口和路径，具体地方有：
+server.xml里的改动四处：
+client1：
+8005 改为 18005
+8080 改为 18080 本标签中 8443 改为 18443
+8009 改为 18009 本标签中 8443 改为 18443
+自己增加的8443端口：
+8443 改为 18443
+
+client2：
+8005 改为 28005
+8080 改为 28080 本标签中 8443 改为 28443
+8009 改为 28009 本标签中 8443 改为 28443
+自己增加的8443端口：
+8443 改为 28443
+
+启动访问：
+http://client1.sso.maple.com:18080/examples/servlets/
+改编：（默认带的案例example）
+http://127.0.0.1:18080/examples/servlets/
+http://127.0.0.1:28080/examples/servlets/
+修改host后：
+http://client1.sso.maple.com:18080/examples/servlets/
+http://client2.sso.maple.com:28080/examples/servlets/
+ 
+4、将 cas-client-core-3.2.1.jar 和 commons-logging-1.1.jar 复制到apache-tomcat-9.0.34-cas-client1里的D:\beijing\develop\apache-tomcat-9.0.34-cas-client1\webapps\examples\WEB-INF\lib下面，并在D:\beijing\develop\apache-tomcat-9.0.34-cas-client1\webapps\examples\WEB-INF\web.xml添加如下配置（这里需要修改相关地址）
+
+PS：然后记得复制cas-client-core-3.2.1.jar 和 commons-logging-1.1.jar到lib下，以及修改web.xml。
+改编：
+第一：
+\webapps\examples\WEB-INF\lib下添加：cas-client-core-3.2.1.jar 和 commons-logging-1.1.jar 
+第二：
+\webapps\examples\WEB-INF\web.xml添加如下配置
+详情见：《cas的client的web.xml中配置》
+区别： 
+	（这里需要修改相关地址）
+	还是修改host的吧，不然这里的代码就是死的
+	127.0.0.1 sso.maple.com
+	127.0.0.1 client1.sso.maple.com
+	127.0.0.1 client2.sso.maple.com
+详细：
+https://demo.micmiu.com:8443/cas/login
+http://app1.micmiu.com:18080
+
+https://demo.micmiu.com:8443/cas
+http://app1.micmiu.com:18080
+
+修改为：上面部署的server的cas的端口，和本client的端口	
+修改host后：
+client1：
+https://sso.maple.com:8443/cas/login
+http://client1.sso.maple.com:18080
+
+https://sso.maple.com:8443/cas
+http://client1.sso.maple.com:18080
+	
+client2：
+https://sso.maple.com:8443/cas/login
+http://client2.sso.maple.com:28080
+
+https://sso.maple.com:8443/cas
+http://client2.sso.maple.com:28080
+
+最后替换两个tomcat的client
+D:\work\sso
+
+###################################################
+五、测试SSO单点登录
+1.基本的测试
+
+预期流程： 打开client1 url —-> 跳转cas server 验证 —-> 显示client1的应用 —-> 打开client2 url —-> 显示client2 应用 —-> 注销cas server —-> 打开client1/client2 url —-> 重新跳转到cas server 验证.
+
+说明：
+目前为止：
+一个server：
+https://sso.maple.com:8443/cas/login 或：https://sso.maple.com:8443/cas
+用户名为：casuser
+默认密码：Mellon
+退出：https://sso.maple.com:8443/cas/logout
+
+两个client：
+http://client1.sso.maple.com:18080/examples/servlets/
+http://client2.sso.maple.com:28080/examples/servlets/
+自带的欢迎页面为：
+http://client1.sso.maple.com:18080/examples/servlets/servlet/HelloWorldExample 
+http://client2.sso.maple.com:28080/examples/servlets/servlet/HelloWorldExample 
+
+
+2、先把三个tomcat都重新启动，确保都可以访问，cas-server先不用登录
+
+3、输入http://client1.sso.maple.com:18080/examples/servlets/servlet/HelloWorldExample ，由于没有登录所以跳到登录界面
+
+4、这个时候我们输入用户名和密码，登录成功，出现以下界面
+
+5、然后我们再访问client2，http://client2.sso.maple.com:28080/examples/servlets/servlet/HelloWorldExample ，由于刚刚在client1里已经登录成功了，所以这里应该无需再登录，直接可以看到页面
+
+6、接下来我们将cas注销掉（一定要在同一个浏览器里进行登出，因为清除的是当前浏览器里的信息）
+
+
+7、再次访问上面两个地址
+
+http://client1.sso.maple.com:18080/examples/servlets/servlet/HelloWorldExample
+
+http://client2.sso.maple.com:28080/examples/servlets/servlet/HelloWorldExample
+
+发现均需要重新登录
+
+
+
+至此，SSO单点登录测试完成
+
+
+————————————————
+版权声明：本文为CSDN博主「maple 枫」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/qq_33101675/article/details/105458069
+
+############################################################################################
+3、然后我们在springboot里把shiro和cas集成起来，当做cas-client，和cas-server一起测试SSO单点登录的功能
+
+########################################
+上篇文章我们使用cas-server和cas-client测试SSO单点登录的功能，本篇文章我们将在springboot + shiro + cas 实现 登录 + 授权 + sso单点登录 （二） 这篇文章的基础上改，所以建议先把这篇shiro的配置做好。我们在shiro里集成cas，把它作为cas-client，然后和cas-server一起来测试SSO单点登录的功能。
+
+相比之前文章，这里的改动主要在以下几个方面：
+
+ShiroConfiguration ——> ShiroCasConfiguration：主要是单点登录、登出的相关配置和跳转地址，把shiro-session拿掉，不然单点登出会有问题。
+
+UserShiroRealm ——> UserShiroCasRealm：无需在做登录认证，因为登录认证这一块我们在cas-server里去做，只需做授权即可
+
+ShiroController ——> ShiroCasController：主要是重定向的地址变了
+
+########################################
+测试：
+因为：本机nexus占用 8081;中间件cas-server占用 8080
+这里用8082
+
+http://localhost:8082/index
+账号密码：casuser/Mellon
+
+第二节的中间件方式部署：
+一个server：
+https://sso.maple.com:8443/cas/login 或：https://sso.maple.com:8443/cas
+用户名为：casuser
+默认密码：Mellon
+退出：https://sso.maple.com:8443/cas/logout
+
+
+逻辑测试：
+1、我们输入 http://localhost:8081/index ，由于没有登录，我们将会跳到 cas-server的登录界面去登录，登录成功之后
+
+跳转到：
+
+ 输入默认账号密码：casuser/Mellon
+
+2、我们输入登出地址：http://localhost:8081/logout ，发现调到cas-server的登录功能
+
+3、我们再次访问http://localhost:8081/index ，因为登出成功了，所以这个时候又跳转到登录页面了
+
+
+ ok，至此，SSO单点登录测试完成。
+下篇文章我们将cas-server进行改造，因为我们现在登录的账号都是casuser/Mellon，实际项目中，都是用户输入自己的账号密码，然后我们去DB里校验是否正确的。
+————————————————
+版权声明：本文为CSDN博主「maple 枫」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/qq_33101675/article/details/105577898
+
+
+############################################################################################
+4、改造cas-server，集成我们的DB
+
+############################
+CAS模板开源程序：
+本篇文章我们将改造cas-server，让他接入我们的数据库，不再使用默认的账密：casuser/Mellon
+
+首先使用官网推荐的方法：git clone https://github.com/apereo/cas-overlay-template/tree/4.2，我这里用的是4.2版本，因为他是maven构建的，5以上的版本是gradle构建的，我对gradle没有maven熟练。
+
+clone完成，导入我们的idea里，mvn clean install 开始下载jar包。下载完成之后，我们的工程是这样子的。
+
+首先我们先看
+
+WEB-INF/spring-configuration/propertyFileConfigurer.xml 这个文件，把里面的
+
+<util:properties id="casProperties" location="file:/etc/cas/cas.properties" />
+改为（根据你的项目路径而定）
+
+<util:properties id="casProperties" location="file:D:\beijing\project\my\cas-overlay-template-4.2\etc\cas.properties" />
+然后我们mvn clean package，打个war包，放在tomcat里的webapps下面，启动tomcat，输入https://sso.maple.com:8443/cas，即可看到登录页面
+
+输入默认的账密：casuser/Mellon，即可登录成功
+
+输入https://sso.maple.com:8443/cas/logout 登出
+
+再次输入https://sso.maple.com:8443/cas/，还是会跳到登录页面
+
+到此为止，我们的工程都是OK的，下面开始集成我们的数据库。
+
+
+############################
+数据库集成：
+采用第二种方式，也需要有第一种方式的配置过程
+https://sso.maple.com:8443/cas
+账户：zhangsan
+密码：zhangsan 
+默认的账密：casuser/Mellon
+退出：https://sso.maple.com:8443/cas/logout
+
+整体步骤：
+源码：git clone https://github.com/apereo/cas-overlay-template/tree/4.2
+分支：4.2
+需要：
+修改1：把路径改对WEB-INF/spring-configuration/propertyFileConfigurer.xml
+<util:properties id="casProperties" location="file:D:\beijing\project\my\cas-overlay-template-4.2\etc\cas.properties" />
+修改2：新建数据库：test_sso 建表：user 并插入数据
+修改3：引入pom 
+引入： mysql-connector-java 和 cas-server-support-jdbc
+修改4：修改 deployerConfigContext.xml文件
+修改 D:\beijing\project\my\cas-overlay-template-4.2\target\war\work\org.jasig.cas\cas-server-webapp\WEB-INF\deployerConfigContext.xml 这个文件
+增加：dataSource
+增加：myQueryDatabaseAuthenticationHandler
+增加：databaseAuthenticationHandler
+注释：primaryAuthenticationHandler
+修改5：cas.properties 文件
+把 etc/cas.properties 里面的 cas.jdbc.authn.query.sql 前面的注释去掉，加上 sql 
+
+
+
+第一种方式：只有密码需要查询，使用默认加密方式，没有salt
+--------------------------------------------------------优雅的分割线-----------------------------------------------------------------
+
+一、建库（sso），建表（user），插入初始化数据
+CREATE TABLE `user` (
+  `id` bigint(15) NOT NULL COMMENT '主键',
+  `account` varchar(30) DEFAULT NULL COMMENT '账号',
+  `password` varchar(255) DEFAULT NULL COMMENT '密码',
+  `valid` tinyint(1) DEFAULT NULL COMMENT '是否有效',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+ 
+INSERT INTO `sso`.`user` (`id`, `account`, `password`, `valid`) VALUES ('1', 'zhangsan', '01d7f40760960e7bd9443513f22ab9af', '1');
+ 
+
+二、引入pom
+        <dependency>
+            <groupId>org.jasig.cas</groupId>
+            <artifactId>cas-server-support-jdbc</artifactId>
+            <version>${cas.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+ 
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>5.1.31</version>
+            <scope>runtime</scope>
+        </dependency>
+三、修改deployerConfigContext.xml文件
+修改 D:\beijing\project\my\cas-overlay-template-4.2\target\war\work\org.jasig.cas\cas-server-webapp\WEB-INF\deployerConfigContext.xml 这个文件
+
+1、把 
+
+<alias name="acceptUsersAuthenticationHandler" alias="primaryAuthenticationHandler" />
+注释掉
+
+2、新增以下配置
+
+<!--begin 从数据库中的用户表中读取 -->
+    <bean id="MD5PasswordEncoder"
+          class="org.jasig.cas.authentication.handler.DefaultPasswordEncoder"
+          autowire="byName">
+        <constructor-arg value="MD5" />
+    </bean>
+ 
+    <bean id="queryDatabaseAuthenticationHandler" name="databaseAuthenticationHandler"
+          class="org.jasig.cas.adaptors.jdbc.QueryDatabaseAuthenticationHandler">
+        <property name="passwordEncoder" ref="MD5PasswordEncoder" />
+    </bean>
+ 
+    <alias   name="dataSource"   alias="queryDatabaseDataSource"/>
+ 
+    <bean   id="dataSource"
+            class="com.mchange.v2.c3p0.ComboPooledDataSource"
+            p:driverClass="com.mysql.jdbc.Driver"
+            p:jdbcUrl="jdbc:mysql://106.15.184.65:3306/sso"
+            p:user="root"
+            p:password="8UNG3dp"
+            p:initialPoolSize="6"
+            p:minPoolSize="6"
+            p:maxPoolSize="18"
+            p:maxIdleTimeExcessConnections="120"
+            p:checkoutTimeout="10000"
+            p:acquireIncrement="6"
+            p:acquireRetryAttempts="5"
+            p:acquireRetryDelay="2000"
+            p:idleConnectionTestPeriod="30"
+            p:preferredTestQuery="select 1"/>
+    <!--end  从数据库中的用户表中读取 -->
+3、把 
+
+<entry key-ref="primaryAuthenticationHandler" value-ref="primaryPrincipalResolver" />
+改为
+
+<entry key-ref="databaseAuthenticationHandler" value-ref="primaryPrincipalResolver" />
+四、修改cas.properties文件
+把 etc/cas.properties 里面的 cas.jdbc.authn.query.sql 前面的注释去掉，加上 
+
+SELECT password from user where account = ? and valid = true
+五、打war包，放进tomcat里的webapps，启动tomcat，输入https://sso.maple.com:8443/cas，使用 zhangsan/zhangsan 登录
+
+
+ OK，那到这里我们就集成完数据库了。
+
+--------------------------------------------------------优雅的分割线-----------------------------------------------------------------
+##################################
+第二种方式：密码需要查询，salt需要自己查询，并且判断密码正确性
+
+有的同学想说，我们数据库里存的还有盐值呢，一般密码字段存的是  Sha256/MD5(password+salt) 这样子的加密算法，这样就不用默认的加密算法，且还要把 salt 值给查询出来。我们先看一下 目前所使用的QueryDatabaseAuthenticationHandler里面是怎么处理的。
+那我们模仿着这个类写一下，
+
+1、我在这里新增了一个我自己的类  代码内容为： myQueryDatabaseAuthenticationHandler
+关键代码是 
+String encryptedPassword = new Md5Hash(credential.getPassword(), dbSalt, 1024).toHex();
+ 
+2、然后 deployerConfigContext.xml 这里的配置需要改一下
+注释掉：MD5PasswordEncoder
+注释掉：queryDatabaseAuthenticationHandler
+增加自己的：myQueryDatabaseAuthenticationHandler 的bean配置
+
+<bean id="myQueryDatabaseAuthenticationHandler" name="databaseAuthenticationHandler"
+        class="handler.MyQueryDatabaseAuthenticationHandler">
+    </bean>
+	
+	
+3、cas.properties 文件，新增一条获取 salt 的sql
+cas.jdbc.authn.query.salt.sql= SELECT salt from user where account = ? and valid = true
+
+4、计算加密后的密码。密码：zhangsan，盐值：123456，Md5加密次数是1024之后得出来的密码为：d329571893ea0e41a3718a568a10794f
+
+
+5、我们修改表结构，和初始化数据
+CREATE TABLE `user` (
+  `id` bigint(15) NOT NULL COMMENT '主键',
+  `account` varchar(30) DEFAULT NULL COMMENT '账号',
+  `password` varchar(255) DEFAULT NULL COMMENT '密码',
+  `salt` varchar(16) DEFAULT NULL COMMENT '盐',
+  `valid` tinyint(1) DEFAULT NULL COMMENT '是否有效',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+ 
+INSERT INTO `sso`.`user` (`id`, `account`, `password`, `salt`, `valid`) VALUES ('1', 'zhangsan', 'd329571893ea0e41a3718a568a10794f', '123456', '1');
+
+6、打war包，放进tomcat的webapps，测试登录正常
+
+这样我们就可以自定义自己的加密规则了，不论是Sha，还是Hash，Md5，都是一样的思路。
+OK，那今天的 cas-server 集成 数据库，就结束了，下篇文章我们将模仿实际项目，来测试 SSO 单点登录
+
+
+————————————————
+版权声明：本文为CSDN博主「maple 枫」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/qq_33101675/article/details/105597377
+
+
+############################################################################################
+5、多个cas-client和改造后的cas-server一起进行测试，模拟实际中的项目
+
+之前的几篇文章里，我们已经完成了 cas-client（member系统）与 原始的 cas-server 进行 SSO单点登录的测试，也完成了 cas-server 从原始到集成我们数据库的改造，现在我们就来做一下 member 与 改造之后的 cas-server 的SSO测试。
+
+###############################################
+一、允许client以 Http 的格式过来
+
+修改target/war/work/org.jasig.cas/cas-server-webapp/WEB-INF/classes/services/HTTPSandIMAPS-10000001.json，添加http
+
+二、打war包，扔tomcat，启动 cas-server
+
+三、启动member系统，输入 http://localhost:8081/index，跳到 cas-server 的登录页面
+
+ 1、输入我们DB里的账号密码，我的是 maple/123456，登录
+
+ 2、输入http://localhost:8081/logout登出
+
+
+至此，基本工作做完 
+
+-------------------------------------------------优雅的分割线------------------------------------------------------------------------------------------------------
+
+ 但是我们这里只有一个cas-client，就是member，实际的项目中，都会有一个统一认证中心cas-server，和多个子系统，子系统之间可以相互单点，那我们这里再多加一个子系统 order。
+
+
+###############################################
+第二个client：
+子系统 order
+server.port=8083
+测试：
+
+启动cas-server
+
+启动cas-client（member）
+
+启动cas-client（order）
+
+1、先访问：http://localhost:8081/index member的首页，由于没有登录过，需要去统一认证中心里登录
+
+ 登录完成，成功访问 member 系统的 index页面
+
+2、输入：http://localhost:8083/index ，访问 order 系统的index页面，发现不用登录也可以访问
+
+3、点击order系统的登出logout接口
+
+ 可以看到调用统一认证中心的登出接口，会把所有的子系统给全部登出
+
+4、再次访问 member 系统的 http://localhost:8081/index 首页，发现需要再次登录了
+
+ 至此，我们的SSO单点登录模块，全部结束。
+
+###############################################
+改编：
+代码：
+https://github.com/malitao2017/springboot-sso-cas-shrio.git
+
+前提：
+第一次尝试：必须把server部署到tomcat中，mysql必须启动才能用
+第二次尝试：mysql不启动也是可以的，都是按照手写的代码走
+第三次尝试：直接用idea把server部署到tomcat中，idea中tomcat启动配置： https://sso.maple.com:8443/cas
+最终证明不可以，
+deployerConfigContext.xml 和 HTTPSandIMAPS-10000001.json
+会自动补充，并且不是自己修改的内容，只能打成war放到tomcat中运行
+第四次尝试：使用idea用exploded方式进行部署，参考的恒泰的uad的配置，uad是把所有的CAS自动生成的文件放到项目里进行修改，而本次自己的修改只是采用CAS自己的jdbc数据库访问，以及自己做的密码验证，自己拿出来的文件有：
+deployerConfigContext.xml 放到 webapp/WEB-INF/下
+cas.properties 放到 webapp/WEB-INF/下，同时webapp/WEB-INF/spring-configuration中修改：<util:properties id="casProperties" location="${cas.properties.config.location:/WEB-INF/cas.properties}"/>
+HTTPSandIMAPS-10000001.json 放到 /main/resouces/services 下
+原理是，idea自己加载到tomcat中的时候，这三个文件就会自动覆盖目标
+最重要的是可以打断点
+
+server启动方式是war包，部署到tomcat中，两个客户端使用springboot的内置tomcat方式启动
+cas的server是基于上一步的配置mysql的方式进行，自己的测试客户端 member 使用的是8082
+member:
+http://localhost:8082/index
+order:
+http://localhost:8083/index
+
+单点登录服务：配置了证书，必须使用8443连接
+https://sso.maple.com:8443/cas
+账户：zhangsan
+密码：zhangsan
+默认的账密：casuser/Mellon 使用了数据库方式，就不能用了。自己手动更改，可以用了
+退出：https://sso.maple.com:8443/cas/logout
+
+文件：
+HTTPSandIMAPS-10000001.json
+由："serviceId" : "^(https|imaps)://.*",
+改为：
+"serviceId" : "^(https|imaps|http)://.*",
+
+这里对比，自己单系统的shiro
+member（1）:
+http://localhost:8084/index 无拦截
+http://localhost:8084/user
+用户：maple 密码为：123456 盐值：maple 加密后：26bfdfe8689183e9235b1f0beb7a6f46
+http://localhost:8084/query 无权限，报错
+http://localhost:8084/manage 有权限
+http://localhost:8084/login
+http://localhost:8084/logout
+
+
+
+
+————————————————
+版权声明：本文为CSDN博主「maple 枫」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/qq_33101675/article/details/105601169
+
+

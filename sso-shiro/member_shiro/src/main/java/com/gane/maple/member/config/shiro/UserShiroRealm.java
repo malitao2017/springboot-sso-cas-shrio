@@ -54,7 +54,7 @@ public class UserShiroRealm extends AuthorizingRealm {
         //通过token去查询DB，获取用户的密码，这里密码直接写死
         User user = new User();
         user.setUsername(token.getUsername());
-//密码为：123456
+        //测试情况： 用户：maple 密码为：123456 盐值：maple 加密后：26bfdfe8689183e9235b1f0beb7a6f46
         return new SimpleAuthenticationInfo(user, "26bfdfe8689183e9235b1f0beb7a6f46",
                 ByteSource.Util.bytes(user.getUsername()), getName());
 

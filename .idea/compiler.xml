@@ -14,12 +14,8 @@
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="member" target="1.8" />
       <module name="member (1)" target="1.8" />
-      <module name="member_shiro" target="1.8" />
-      <module name="order" target="1.8" />
       <module name="sso_login (1)" target="1.8" />
-      <module name="sso_login_shiro" target="1.8" />
     </bytecodeTargetLevel>
   </component>
 </project>
