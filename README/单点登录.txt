@@ -3,6 +3,10 @@ springboot + shiro + cas 实现 登录 + 授权 + sso单点登录
 
 ############################################################################################
 总简介：
+一共有两种方式：
+一种是纯中间件方式，一个server两个client，server直接下载现成war包，配置jdk生成的证书使用8443安全端口，使用默认的用户名密码。两个client使用tomcat自带的 examples配置web.xml增加jar进行案例测试
+第二种就是纯代码，两个client，一个使用shiro的完全配置，一个使用cas注解，都使用springboot内置tomcat形式启动服务；一个server是下载CAS的github代码，配置对应的文件，代码的自定义修改是使用jdbc方式查询，最后也都走了代码形式写死，目前两个测试用户，zhangsan/zhangsan,casuser/Mellon，密码是加盐方式。
+
 1.tomcat生成ssl的8443安全端口，配置证书 密码123456，生成三个tomcat 
 一个server：8443 8080 
 两个client：18443 18080 ；28443 28080 
